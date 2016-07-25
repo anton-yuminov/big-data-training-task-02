@@ -1,6 +1,11 @@
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
+import com.epam.bigdata.utils.TopLList;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -53,6 +58,34 @@ public class HdfsTask {
         fileSystem.close();
     }
 
+    public static Map<String, Integer> extractCountMap(BufferedReader reader) throws IOException {
+        Map<String, Integer> countMap = new HashMap<>();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            String[] values = line.split("\\t");
+            String id = values[2];
+            Integer count = countMap.get(id);
+            if (count == null) {
+                countMap.put(id, 1);
+            } else {
+                countMap.put(id, count + 1);
+            }
+        }
+        return countMap;
+    }
+
+    public static void fillTop100Desc(Map<String, Integer> countMap, List<String> ids, List<Integer> counts) {
+        TopLList<Integer, String> top = new TopLList<>(100);
+        for(Map.Entry<String, Integer> e : countMap.entrySet()) {
+            top.add(-e.getValue(), e.getKey());
+        }
+
+        for (int i = 0; i < top.getLList().size(); i++) {
+            ids.add(top.getRList().get(i));
+            counts.add(-top.getLList().get(i));
+        }
+    }
+
     public static void main(String[] args) throws IOException {
 
         HdfsTask client = new HdfsTask();
@@ -73,16 +106,20 @@ public class HdfsTask {
             System.exit(1);
         }
 
-
+        Map<String, Integer> countMap;
 
         try (FSDataInputStream in = fileSystem.open(path);
-             BufferedReader reader = new BufferedReader(new InputStreamReader(in));) {
-            String line;
-            while((line = reader.readLine()) != null) {
-                System.out.println(line);
-            }
+             BufferedReader reader = new BufferedReader(new InputStreamReader(in))) {
+            countMap = extractCountMap(reader);
         }
 
+        List<String> outIds = new ArrayList<>();
+        List<Integer> outCounts = new ArrayList<>();
+
+        fillTop100Desc(countMap, outIds, outCounts);
+
+        System.out.println("Out ids: " + outIds);
+        System.out.println("Out counts: " + outCounts);
 
         System.out.println("Done!");
     }
