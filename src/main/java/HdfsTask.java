@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.epam.bigdata.utils.FileProcessor;
 import com.epam.bigdata.utils.TopLList;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -76,7 +77,7 @@ public class HdfsTask {
 
     public static void fillTop100Desc(Map<String, Integer> countMap, List<String> ids, List<Integer> counts) {
         TopLList<Integer, String> top = new TopLList<>(100);
-        for(Map.Entry<String, Integer> e : countMap.entrySet()) {
+        for (Map.Entry<String, Integer> e : countMap.entrySet()) {
             top.add(-e.getValue(), e.getKey());
         }
 
@@ -100,26 +101,34 @@ public class HdfsTask {
         String hdfsInPathString = args[0];
         String hdfsOutPathString = args[1];
 
-        Path path = new Path(hdfsInPathString);
-        if (!fileSystem.exists(path)) {
+        Path pathIn = new Path(hdfsInPathString);
+        if (!fileSystem.exists(pathIn)) {
             System.out.println("File " + hdfsInPathString + " does not exists");
             System.exit(1);
         }
 
-        Map<String, Integer> countMap;
-
-        try (FSDataInputStream in = fileSystem.open(path);
+        FileProcessor fileProcessor;
+        try (FSDataInputStream in = fileSystem.open(pathIn);
              BufferedReader reader = new BufferedReader(new InputStreamReader(in))) {
-            countMap = extractCountMap(reader);
+            fileProcessor = new FileProcessor(reader);
+            fileProcessor.processFile();
         }
 
-        List<String> outIds = new ArrayList<>();
-        List<Integer> outCounts = new ArrayList<>();
-
-        fillTop100Desc(countMap, outIds, outCounts);
+        List<String> outIds = fileProcessor.getSortedIds();
+        List<Integer> outCounts = fileProcessor.getSortedCounts();
 
         System.out.println("Out ids: " + outIds);
         System.out.println("Out counts: " + outCounts);
+
+        Path pathOut = new Path(hdfsOutPathString);
+        try (FSDataOutputStream out = fileSystem.create(pathOut);
+             BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out))) {
+            for (int i = 0; i < outIds.size(); i++) {
+                String s = outIds.get(i) + "\t" + outCounts.get(i);
+                writer.write(s);
+                writer.newLine();
+            }
+        }
 
         System.out.println("Done!");
     }
