@@ -8,15 +8,17 @@ import java.util.Map;
 import com.epam.bigdata.utils.FileProcessor;
 import com.epam.bigdata.utils.TopLList;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionCodecFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class HdfsTask {
+
+    private static final Logger logger = LoggerFactory.getLogger(HdfsTask.class);
+
     public HdfsTask() {
 
     }
@@ -89,6 +91,23 @@ public class HdfsTask {
         }
     }
 
+    private static void processHdfsFile(Path pathIn, Configuration conf, FileSystem fileSystem, FileProcessor fileProcessor) throws IOException {
+        logger.info("Starting file: {}", pathIn);
+        CompressionCodecFactory factory = new CompressionCodecFactory(conf);
+        CompressionCodec codec = factory.getCodec(pathIn);
+
+        if (codec == null) {
+            System.err.println("No codec found for " + pathIn);
+            System.exit(1);
+        }
+
+        try (InputStream in = codec.createInputStream(fileSystem.open(pathIn));
+             BufferedReader reader = new BufferedReader(new InputStreamReader(in))) {
+            fileProcessor.processFile(reader);
+            System.out.println("Complete: " + pathIn.toString() + ". Status: " + fileProcessor.getStatusInfo());
+        }
+    }
+
     public static void main(String[] args) throws IOException {
 
         HdfsTask client = new HdfsTask();
@@ -109,19 +128,14 @@ public class HdfsTask {
             System.exit(1);
         }
 
-        CompressionCodecFactory factory = new CompressionCodecFactory(conf);
-        CompressionCodec codec = factory.getCodec(pathIn);
-
-        if (codec == null) {
-            System.err.println("No codec found for " + hdfsInPathString);
-            System.exit(1);
-        }
-
-        FileProcessor fileProcessor;
-        try (InputStream in = codec.createInputStream(fileSystem.open(pathIn));
-             BufferedReader reader = new BufferedReader(new InputStreamReader(in))) {
-            fileProcessor = new FileProcessor(reader);
-            fileProcessor.processFile();
+        FileProcessor fileProcessor = new FileProcessor();
+        if (fileSystem.isDirectory(pathIn)) {
+            FileStatus[] statuses = fileSystem.listStatus(pathIn);
+            for (FileStatus fileStatus : statuses) {
+                processHdfsFile(fileStatus.getPath(), conf, fileSystem, fileProcessor);
+            }
+        } else {
+            processHdfsFile(pathIn, conf, fileSystem, fileProcessor);
         }
 
         List<String> outIds = fileProcessor.getSortedIds();

@@ -13,8 +13,8 @@ public class FileProcessorTest {
     public void processFile() throws Exception {
         // Sort of integration test
         try (BufferedReader in = new BufferedReader(new InputStreamReader(FileProcessorTest.class.getResourceAsStream("/sample.txt")))) {
-            FileProcessor fp = new FileProcessor(in);
-            fp.processFile();
+            FileProcessor fp = new FileProcessor();
+            fp.processFile(in);
             assertThat(fp.getSortedIds().get(0), is("null"));
             assertThat(fp.getSortedIds().get(1), is("VhnxPx5VPqEyBoC"));
 

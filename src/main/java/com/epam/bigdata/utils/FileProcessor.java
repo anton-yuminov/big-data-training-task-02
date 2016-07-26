@@ -8,19 +8,15 @@ import java.util.List;
 import java.util.Map;
 
 public class FileProcessor {
-    private BufferedReader reader; // read only
     private boolean processed = false;
+    private Map<String, Integer> countMap = new HashMap<>(20_000_000);
+    private int maxMapSize = 0;
 
-    private List<String> sortedIds;
-    private List<Integer> sortedCounts;
+    private List<String> sortedIds = null;
+    private List<Integer> sortedCounts = null;
 
-    public FileProcessor(BufferedReader reader) {
-        this.reader = reader;
-    }
-
-    public void processFile() throws IOException {
+    public void processFile(BufferedReader reader) throws IOException {
         processed = true;
-        Map<String, Integer> countMap = new HashMap<>();
         String line;
         while ((line = reader.readLine()) != null) {
             String[] values = line.split("\\t");
@@ -31,13 +27,46 @@ public class FileProcessor {
             } else {
                 countMap.put(id, count + 1);
             }
+            if (countMap.size() >= maxMapSize + 50_000) {
+                System.out.println("ids count: " + countMap.size());
+                maxMapSize = countMap.size();
+            }
         }
+    }
 
+    public String getStatusInfo() {
+        return "Current map size: " + countMap.size();
+    }
+
+    public List<String> getSortedIds() {
+        if (!processed) {
+            throw new RuntimeException("Call processFile first");
+        }
+        if (!isOutListsFilled()) {
+            fillOutLists();
+        }
+        return sortedIds;
+    }
+
+    public List<Integer> getSortedCounts() {
+        if (!processed) {
+            throw new RuntimeException("Call processFile first");
+        }
+        if (!isOutListsFilled()) {
+            fillOutLists();
+        }
+        return sortedCounts;
+    }
+
+    private boolean isOutListsFilled() {
+        return sortedIds != null;
+    }
+
+    private void fillOutLists() {
         TopLList<Integer, String> top = new TopLList<>(100);
-        for(Map.Entry<String, Integer> e : countMap.entrySet()) {
+        for (Map.Entry<String, Integer> e : countMap.entrySet()) {
             top.add(-e.getValue(), e.getKey());
         }
-
         sortedIds = new ArrayList<>(100);
         sortedCounts = new ArrayList<>(100);
 
@@ -46,17 +75,4 @@ public class FileProcessor {
             sortedCounts.add(-top.getLList().get(i));
         }
     }
-
-    public List<String> getSortedIds() {
-        if (!processed) {
-            throw new RuntimeException("Call processFile first");
-        }
-        return sortedIds;
-    }
-
-    public List<Integer> getSortedCounts() {
-        return sortedCounts;
-    }
-
-
 }
