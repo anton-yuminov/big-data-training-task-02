@@ -12,6 +12,8 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.io.compress.CompressionCodecFactory;
 
 
 public class HdfsTask {
@@ -107,8 +109,16 @@ public class HdfsTask {
             System.exit(1);
         }
 
+        CompressionCodecFactory factory = new CompressionCodecFactory(conf);
+        CompressionCodec codec = factory.getCodec(pathIn);
+
+        if (codec == null) {
+            System.err.println("No codec found for " + hdfsInPathString);
+            System.exit(1);
+        }
+
         FileProcessor fileProcessor;
-        try (FSDataInputStream in = fileSystem.open(pathIn);
+        try (InputStream in = codec.createInputStream(fileSystem.open(pathIn));
              BufferedReader reader = new BufferedReader(new InputStreamReader(in))) {
             fileProcessor = new FileProcessor(reader);
             fileProcessor.processFile();
